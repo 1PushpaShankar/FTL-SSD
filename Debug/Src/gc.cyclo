@@ -1,0 +1,4 @@
+../Src/gc.c:9:13:run_gc	4
+../Src/gc.c:28:10:gc_select_victim_block	4
+../Src/gc.c:45:13:gc_migrate_valid_pages	6
+../Src/gc.c:89:13:gc_erase_victim_block	3

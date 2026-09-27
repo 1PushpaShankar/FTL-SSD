@@ -1,0 +1,11 @@
+../Src/ftl.c:17:14:ftl_init	5
+../Src/ftl.c:44:15:ftl_get_page_status	1
+../Src/ftl.c:49:6:ftl_set_page_status	1
+../Src/ftl.c:54:14:get_free_page_spare	3
+../Src/ftl.c:63:10:get_free_block_count	3
+../Src/ftl.c:74:7:allocate_free_ppa	2
+../Src/ftl.c:82:9:ftl_get_block_number	1
+../Src/ftl.c:88:9:ftl_get_page_number	1
+../Src/ftl.c:93:14:ftl_program	7
+../Src/ftl.c:135:21:ftl_erase	7
+../Src/ftl.c:177:14:ftl_read	5

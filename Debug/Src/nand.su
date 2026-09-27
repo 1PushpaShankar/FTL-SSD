@@ -1,0 +1,4 @@
+../Src/nand.c:11:6:nand_init	8	static
+../Src/nand.c:16:15:nand_program	24	static
+../Src/nand.c:25:15:nand_read	24	static
+../Src/nand.c:35:15:nand_erase	32	static
