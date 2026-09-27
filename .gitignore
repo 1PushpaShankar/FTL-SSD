@@ -1,0 +1,15 @@
+
+Debug/
+Release/
+build/
+*.o
+*.d
+*.elf
+*.hex
+*.bin
+*.map
+*.launch
+.settings/
+*.code-workspace
+*.pdf
+*.zip

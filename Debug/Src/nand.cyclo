@@ -1,4 +1,0 @@
-../Src/nand.c:11:6:nand_init	1
-../Src/nand.c:16:15:nand_program	1
-../Src/nand.c:25:15:nand_read	1
-../Src/nand.c:35:15:nand_erase	2
