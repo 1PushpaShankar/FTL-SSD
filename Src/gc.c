@@ -45,8 +45,9 @@ uint16_t gc_select_victim_block(void){
 gc_status_t gc_migrate_valid_pages(uint16_t victim){
 	 uint16_t pages = victim * PAGES_PER_BLOCK;
 	 uint8_t temp_buffer[PAGE_SIZE];
-     for (uint16_t old_ppn = pages; old_ppn < (pages + PAGES_PER_BLOCK); old_ppn++ ){
+	 if(block_table[victim].is_bad ) return BAD_BLOCK;
 
+     for (uint16_t old_ppn = pages; old_ppn < (pages + PAGES_PER_BLOCK); old_ppn++ ){
     	 if(page_state[old_ppn] != PAGE_PROGRAMMED){
     		 continue;
     	 }
@@ -90,21 +91,32 @@ gc_status_t gc_erase_victim_block(uint16_t victim){
 	nand_status_t e_status = nand_erase(victim);
 
 	if(e_status != NAND_ERASE_OK){
-		return GC_NAND_ERROR;
-	}
-		ppa_t start =  victim * PAGES_PER_BLOCK;
-		ppa_t end   =  start  + PAGES_PER_BLOCK;
-
-		for(ppa_t ppa = start; ppa < end; ppa++){
-			  ppa_lpa[ppa] = LPA_INVALID;
-			  ftl_set_page_status(ppa, PAGE_FREE);
-		  }
-
-		block_table[victim].erase_count++;
+		block_table[victim].is_bad = 1;
 		block_table[victim].valid_page_count   = 0;
 		block_table[victim].invalid_page_count = 0;
 		block_table[victim].free_page_count    = PAGES_PER_BLOCK;
+		return GC_NAND_ERROR;
+	}
 
-		return GC_OK;
+	ppa_t start =  victim * PAGES_PER_BLOCK;
+	ppa_t end   =  start  + PAGES_PER_BLOCK;
+
+	for(ppa_t ppa = start; ppa < end; ppa++){
+		  ppa_lpa[ppa] = LPA_INVALID;
+		  ftl_set_page_status(ppa, PAGE_FREE);
+	  }
+
+	block_table[victim].erase_count++;
+	if(block_table[victim].erase_count >= MAX_ERASE_COUNT ){
+		block_table[victim].is_bad = 1U;
+		block_table[victim].valid_page_count   = 0;
+		block_table[victim].invalid_page_count = 0;
+		block_table[victim].free_page_count    = PAGES_PER_BLOCK;
+	}
+	block_table[victim].valid_page_count   = 0;
+	block_table[victim].invalid_page_count = 0;
+	block_table[victim].free_page_count    = PAGES_PER_BLOCK;
+
+	return GC_OK;
 
 }

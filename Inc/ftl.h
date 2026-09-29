@@ -14,14 +14,17 @@
 #define SPARE_PAGE_COUNT      (PHY_PAGE_COUNT - LOGICAL_PAGE_COUNT)
 
 #define FTL_INVALID_PPA       (0xFFFFFFFFU)
+#define BLOCK_INVALID         (0xFFFFFFFFU)
 #define LPA_INVALID           ((lpa_t) -1)
 
 #define LOW_WATERMARK_GC   8U
 #define HIGH_WATERMARK_GC  16U
 
+#define MAX_ERASE_COUNT 10U
+
 typedef uint32_t lpa_t;
 typedef uint32_t ppa_t;
-// In ftl.h (or tasks.h)
+
 extern volatile bool gc_requested;
 
 typedef enum
@@ -44,7 +47,14 @@ typedef struct{
 	uint16_t read_count;
 	uint16_t reprogram_count;
 	uint16_t free_page_count;
+	uint8_t  is_bad;
 }block_stats_t;
+
+typedef enum {
+	BLOCK_ERR_INVALID,
+	BAD_BLOCK,
+}block_state;
+
 
 typedef enum
 {

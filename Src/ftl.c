@@ -12,8 +12,6 @@ block_stats_t block_table[BLOCK_COUNT];
 page_status_t page_state[BLOCK_COUNT * PAGES_PER_BLOCK];
 lpa_t ppa_lpa[PHY_PAGE_COUNT];
 
-
-
 ftl_status_t ftl_init(){
   for(lpa_t lpa = 0U; lpa < LOGICAL_PAGE_COUNT; lpa++){
 	  ftl_map[lpa] = FTL_INVALID_PPA;
@@ -52,11 +50,35 @@ void ftl_set_page_status(ppa_t ppn, page_status_t status ){
 }
 
 static ppa_t get_free_page_spare(){
-	for(ppa_t ppn = 0 ; ppn < PHY_PAGE_COUNT; ppn++){
+	uint32_t best_block = BLOCK_INVALID;
+	uint32_t best_rs    = UINT32_MAX;
+	for(uint16_t b = 0 ; b < BLOCK_COUNT; b++){
+
+		if(block_table[b].is_bad)continue;
+
+		if(block_table[b].free_page_count == 0){
+			 continue;
+		}
+
+		if(block_table[b].erase_count < best_rs ){
+			best_rs = block_table[b].erase_count;
+			best_block = b;
+		}
+	}
+
+	if(best_block == BLOCK_INVALID) {
+	   return BLOCK_ERR_INVALID;
+	  }
+
+	ppa_t start = best_block * PAGES_PER_BLOCK;
+	ppa_t end   = start + PAGES_PER_BLOCK;
+
+   for(ppa_t ppn = start ; ppn < end ; ppn++){
 		if(ftl_get_page_status(ppn) == PAGE_FREE){
 			 return ppn;
 		}
 	}
+
 	return FTL_INVALID_PPA;
 }
 
