@@ -52,10 +52,9 @@ void ftl_set_page_status(ppa_t ppn, page_status_t status ){
 static ppa_t get_free_page_spare(){
 	uint32_t best_block = BLOCK_INVALID;
 	uint32_t best_rs    = UINT32_MAX;
+
 	for(uint16_t b = 0 ; b < BLOCK_COUNT; b++){
-
 		if(block_table[b].is_bad)continue;
-
 		if(block_table[b].free_page_count == 0){
 			 continue;
 		}

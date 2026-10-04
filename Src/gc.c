@@ -17,7 +17,7 @@ gc_status_t run_gc(){
 		return m_status;
 	}
 	gc_status_t e_status = gc_erase_victim_block(victim);
-	if(e_status != GC_MIGRATED_VICTIM){
+	if(e_status != GC_OK){
 		return e_status;
 	}
 
@@ -111,7 +111,7 @@ gc_status_t gc_erase_victim_block(uint16_t victim){
 		block_table[victim].is_bad = 1U;
 		block_table[victim].valid_page_count   = 0;
 		block_table[victim].invalid_page_count = 0;
-		block_table[victim].free_page_count    = PAGES_PER_BLOCK;
+		block_table[victim].free_page_count    = 0U;
 	}
 	block_table[victim].valid_page_count   = 0;
 	block_table[victim].invalid_page_count = 0;

@@ -24,15 +24,15 @@ nand_status_t nand_program(ppa_t ppn, const uint8_t *data_buffer){
 
 nand_status_t nand_read(uint32_t ppn, uint8_t *data_buffer){
 
-	uint8_t block_number = ppn/PAGES_PER_BLOCK;
-	uint8_t page_number  = ppn % PAGES_PER_BLOCK;
+	uint16_t block_number = ppn/PAGES_PER_BLOCK;
+	uint16_t page_number  = ppn % PAGES_PER_BLOCK;
 	memcpy(data_buffer, nand_array[block_number][page_number], PAGE_SIZE);
 
 	return NAND_READ_OK;
 }
 
 
-nand_status_t nand_erase(uint8_t block_number){
+nand_status_t nand_erase(uint16_t block_number){
 
     uint32_t  first_ppn = block_number * PAGES_PER_BLOCK;
     uint32_t  last_ppn  = first_ppn  + PAGES_PER_BLOCK - 1;
