@@ -1,130 +1,225 @@
-# STM32 FTL + Garbage Collector with FreeRTOS
+# STM32 FTL + Garbage Collector + Wear Leveling with FreeRTOS
 
-A lightweight Flash Translation Layer (FTL) and garbage collector (GC) for an emulated NAND flash, implemented in C on STM32 with FreeRTOS.
+A lightweight Flash Translation Layer (FTL), garbage collector (GC), and wear-leveling (WL) system for emulated NAND flash, implemented in C on an STM32 microcontroller with FreeRTOS.
 
-This project demonstrates:
-
-- Basic NAND flash abstraction (pages, blocks, program/erase constraints).
-- A full FTL: logical-to-physical mapping, page status tracking, and block statistics.
-- A background garbage collector that reclaims invalid pages.
-- A FreeRTOS-based scheduler with two tasks:
-  - High-priority FTL task (simulates host I/O).
-  - Low-priority GC task (runs when free pages drop below a threshold).
+The project demonstrates how a storage system can manage logical-to-physical mapping, reclaim invalid pages, distribute wear across flash blocks, and expose runtime control through an interrupt-driven UART command-line interface.
 
 ## Features
 
 ### NAND Flash Emulation
 
 - Configurable geometry:
-  - `PAGE_SIZE`, `PAGES_PER_BLOCK`, `BLOCK_COUNT`
-- Operations:
+  - `PAGE_SIZE`
+  - `PAGES_PER_BLOCK`
+  - `BLOCK_COUNT`
+- Low-level operations:
   - `nand_program_page()`
   - `nand_read_page()`
   - `nand_erase_block()`
-- Enforces NAND constraints:
-  - Cannot program an already-programmed page.
-  - Cannot program a free page.
-  - Must erase a block before reusing its pages.
+- NAND constraints enforced:
+  - A programmed page cannot be programmed again.
+  - A free page cannot be read as valid data.
+  - A block must be erased before its pages can be reused.
 
-### Flash Translation Layer (FTL)
+### Flash Translation Layer
 
-- Logical-to-physical mapping:
-  - `ftl_map[LPA]` → PPA
-  - `ppa_lpa[PPA]` → LPA (reverse mapping)
-- Page status tracking:
-  - `PAGE_FREE`, `PAGE_PROGRAMMED`, `PAGE_INVALID`
-- Block statistics:
-  - `valid_page_count`, `invalid_page_count`, `free_page_count`
-- Core operations:
+- Logical-to-physical address mapping:
+  - `ftl_map[LPA] → PPA`
+  - `ppa_lpa[PPA] → LPA`
+- Page state tracking:
+  - `PAGE_FREE`
+  - `PAGE_PROGRAMMED`
+  - `PAGE_INVALID`
+- Per-block statistics:
+  - Valid page count
+  - Invalid page count
+  - Free page count
+- Core API:
   - `ftl_program(lpa, data)`
   - `ftl_read(lpa, buffer)`
   - `ftl_get_status()`
+  - `get_free_block_count()`
 
 ### Garbage Collection
 
-- Triggered when free pages drop below `LOW_WATERMARK_GC`.
-- Victim selection:
-  - Chooses the block with the most invalid pages.
-- Migration:
-  - Moves all valid pages to new locations via `ftl_program()`.
-  - Updates mapping and page status.
-- Erase:
-  - Erases the victim block and updates block stats.
+- Triggered when the number of free blocks falls below `LOW_WATERMARK_GC`.
+- Victim-block selection:
+  - Selects the block with the highest number of invalid pages.
+- Valid-page migration:
+  - Copies valid pages from the victim block to a new location.
+  - Updates logical-to-physical and reverse mappings.
+- Block reclamation:
+  - Erases the victim block.
+  - Updates page and block statistics.
+- Runs as a lower-priority FreeRTOS task and is activated using a binary semaphore.
+
+### Wear Leveling
+
+- Periodically evaluates flash-block wear.
+- Triggered after a configurable number of FTL writes or after GC activity.
+- Moves data from frequently erased or heavily used blocks to less-used blocks.
+- Helps distribute erase cycles more evenly across the NAND device.
+- Runs as the lowest-priority FreeRTOS task and is activated using a binary semaphore.
 
 ### FreeRTOS Scheduler
 
-- Two tasks:
-  - **FTL Task** (high priority):
-    - Continuously issues writes (and optionally reads).
-    - Simulates host workload.
-  - **GC Task** (low priority):
-    - Sleeps on a semaphore.
-    - Woken by FTL task when free pages ≤ `LOW_WATERMARK_GC`.
-    - Runs one GC cycle, then goes back to sleep.
-- Synchronization:
-  - One-way binary semaphore from FTL → GC.
-  - No direct FTL↔GC data sharing; GC uses global FTL state.
+The system uses three cooperating tasks:
+
+| Task | Priority | Responsibility |
+|---|---:|---|
+| `uart_cli_task` | Configurable | Receives UART commands, parses them, and calls FTL/GC/WL functions |
+| `ftl_task` | High | Simulates host writes and monitors free-block level |
+| `gc_task` | Medium/Low | Reclaims blocks containing invalid pages |
+| `wl_task` | Low | Performs wear-leveling checks and page relocation |
+
+> Note: In FreeRTOS, a higher numeric priority means a higher task priority.
+
+### Profiling
+
+The project includes lightweight cycle-based profiling for major operations:
+
+- FTL program operations
+- Garbage-collection cycles
+- Wear-leveling operations
+
+Statistics include operation count, total cycles, minimum cycles, maximum cycles, and average cycles. These values can be displayed through the UART CLI.
+
+## UART Command-Line Interface
+
+The project includes an interrupt-driven UART CLI.
+
+Data flow:
+
+```text
+PC terminal
+   ↓
+USART2 RX interrupt
+   ↓
+FreeRTOS queue
+   ↓
+uart_cli_task()
+   ↓
+line buffer
+   ↓
+handle_command()
+   ↓
+FTL / GC / WL functions
+   ↓
+UART response
+```
+
+The UART ISR only reads a received byte and places it into a FreeRTOS queue. The CLI task performs line assembly, command parsing, and command execution.
+
+Example interaction:
+
+```text
+> help
+Commands:
+help
+status
+read <lpa>
+write <lpa> <byte>
+gc
+
+> status
+FTL writes: 120
+FTL avg cycles: 17450
+GC runs: 2
+GC avg cycles: 48300
+WL checks: 1
+WL avg cycles: 9100
+Free blocks: 13
+```
 
 ## Project Structure
 
-Key files:
-
-- `nand_flash.h/c` – NAND emulation and low-level operations.
-- `ftl.h/c` – FTL data structures and API.
-- `main.c` – FreeRTOS task creation, scheduler start.
+```text
+main.c          FreeRTOS task creation, scheduler startup, workload generation
+uart.c/.h       UART initialization, TX/RX, interrupt handler, queue interface
+cli.c/.h        UART CLI task and command parser
+nand.c/.h       Emulated NAND flash and low-level flash operations
+ftl.c/.h        Logical-to-physical mapping, program/read operations, FTL state
+gc.c/.h         Garbage collection and victim-block reclamation
+wl.c/.h         Wear-leveling checks and page relocation
+profiler.c/.h   Cycle-based performance profiling
+```
 
 ## How It Works
 
-1. **FTL Task**:
-   - Writes data to sequential LPAs in a loop.
-   - After each write, checks `ftl_get_status().free_pages`.
-   - If `free_pages <= LOW_WATERMARK_GC`, gives the GC semaphore.
+1. `main()` initializes UART, FTL, profiler, FreeRTOS objects, and tasks.
+2. `ftl_task()` continuously writes data to sequential logical page addresses.
+3. After a configured number of writes, the FTL task signals the wear-leveling task.
+4. If the number of free blocks falls below the GC watermark, the FTL task signals the GC task.
+5. `gc_task()` selects a victim block, migrates valid pages, erases the victim block, and updates mappings.
+6. `wl_task()` evaluates block wear and relocates pages when appropriate.
+7. `uart_cli_task()` receives user commands and provides runtime access to FTL state and operations.
 
-2. **GC Task**:
-   - Blocks on the semaphore.
-   - When signaled, scans `block_table[]` to find a victim block.
-   - Migrates valid pages, erases the victim block.
-   - Returns to waiting on the semaphore.
+## Synchronization
 
-3. **Integrity**:
-   - Mapping consistency:
-     - `ftl_map[lpa]` ↔ `ppa_lpa[ppn]`
-   - Page state consistency:
-     - `page_state[ppn]` matches mapping.
-   - Block counters:
-     - `valid + invalid + free == PAGES_PER_BLOCK`.
+- Binary semaphores are used for one-way task signaling:
+  - FTL task → GC task
+  - FTL task / GC task → WL task
+- A FreeRTOS queue transfers received UART characters from the ISR to the CLI task.
+- The FTL, GC, and WL modules operate on shared FTL state protected by the system’s task scheduling and signaling design.
 
-TODO : add an `ftl_verify_integrity()` function (debug-only) to assert these invariants periodically.
+## Integrity
 
-## Building & Running
+The system maintains consistency between:
 
-- Target: STM32 (e.g., STM32F4/F7/H7) with FreeRTOS.
-- Toolchain: STM32CubeIDE / GCC ARM.
-- Steps:
-  1. Import project into your IDE.
-  2. Ensure FreeRTOS is configured and running.
-  3. Build and flash to your board (or run in QEMU / simulator if configured).
-  4. Observe:
-     - FTL and GC tasks running.
-     - Profilers incrementing.
-     - Mapping and block stats updating in the debugger.
+- `ftl_map[LPA]` and `ppa_lpa[PPA]`
+- Page state and current mapping
+- Block-level valid, invalid, and free page counters
+
+Planned improvement:
+
+- Add `ftl_verify_integrity()` as a debug-only function to periodically assert these invariants.
+
+## Building and Running
+
+### Requirements
+
+- STM32 development board, such as an STM32F4 Discovery board
+- STM32CubeIDE or GCC ARM toolchain
+- FreeRTOS
+- USB-UART terminal application, such as PuTTY, Tera Term, Minicom, or screen
+
+### Steps
+
+1. Import the project into STM32CubeIDE.
+2. Build the project.
+3. Flash the firmware to the board.
+4. Open a serial terminal at `115200` baud.
+5. Use the CLI to inspect FTL state and issue commands.
+
+Example:
+
+```text
+> status
+> write 10 65
+> read 10
+> gc
+```
 
 ## Future Improvements
 
-- Add UART interface:
-  - Command-line interface for basic FTL operations (read/write/erase, status).
-  - Simple test scripts to validate FTL and GC behavior over UART.
-- Add Ethernet interface:
-  - Higher-speed host interface for stress testing the FTL and GC.
-  - Potential for network-based storage experiments.
-- Enhance garbage collection:
-  - More sophisticated victim selection policies.
-  - Tunable watermarks and GC aggressiveness.
-- Add wear leveling:
-  - Distribute writes across blocks to extend flash lifetime.
-- Improve robustness:
-  - Power-failure safety (e.g., metadata checkpoints, journaling).
-  - More integrity checks and debug utilities.
+- Add full CLI support for:
+  - `status`
+  - `read <lpa>`
+  - `write <lpa> <byte>`
+  - `gc`
+  - `wl`
+  - `erase`
+- Add automated UART test scripts.
+- Add `ftl_verify_integrity()` for runtime consistency checking.
+- Improve GC victim-selection policies.
+- Add configurable GC and WL watermarks.
+- Add power-failure safety using metadata checkpoints or journaling.
+- Add Ethernet or USB Mass Storage as a higher-performance host interface.
+- Add bad-block management and retention-aware page placement.
+
+## License
+
+Add your preferred license here, for example MIT License.
 
 ## License
 
