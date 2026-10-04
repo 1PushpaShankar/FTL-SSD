@@ -219,10 +219,6 @@ Example:
 
 ## License
 
-Add your preferred license here, for example MIT License.
-
-## License
-
 MIT License
 
 Copyright (c) 2026 Pushpa Shankar
