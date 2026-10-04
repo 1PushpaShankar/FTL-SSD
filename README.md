@@ -202,6 +202,38 @@ Example:
 
 ## Future Improvements
 
+- FPGA-based NAND controller:
+  - Move time-critical NAND operations into an FPGA.
+  - Implement NAND command sequencing, ECC, bad-block management, and page caching in hardware.
+  - Use the STM32 as a host processor and the FPGA as a storage accelerator.
+  - Communicate between STM32 and FPGA using SPI, UART, parallel bus, or high-speed interface such as FMC.
+
+- Hardware-accelerated FTL components:
+  - Offload mapping-table lookup, page-status tracking, and block-statistics updates to FPGA logic.
+  - Implement parallel garbage-collection scanning for faster victim-block selection.
+  - Accelerate CRC/ECC calculation and data integrity checking.
+
+- Full CLI support for:
+  - `status`
+  - `read <lpa>`
+  - `write <lpa> <byte>`
+  - `gc`
+  - `wl`
+  - `erase`
+
+- Automated UART test scripts.
+
+- `ftl_verify_integrity()` for runtime consistency checking.
+
+- Improved GC victim-selection policies.
+
+- Configurable GC and WL watermarks.
+
+- Power-failure safety using metadata checkpoints or journaling.
+
+- Ethernet or USB Mass Storage as a higher-performance host interface.
+
+- Bad-block management and retention-aware page placement.
 - Add full CLI support for:
   - `status`
   - `read <lpa>`
