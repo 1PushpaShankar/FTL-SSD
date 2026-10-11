@@ -5,6 +5,7 @@
 #include "stm32f4xx.h"
 #include "profiler.h"
 
+
 void profiler_init(void){
 	CoreDebug->DEMCR |= CoreDebug_DEMCR_TRCENA_Msk;
 	DWT->CTRL |= DWT_CTRL_CYCCNTENA_Msk;

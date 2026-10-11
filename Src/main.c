@@ -15,15 +15,11 @@
 #include "gc.h"
 #include "wl.h"
 #include "profiler.h"
-
-#define WL_CHECK_INTERVAL_WRITES            100U
-#define WL_MIN_FREE_BLOCKS                  5U
+#include "nand_control.h"
+#include "app_defs.h"
+#include "app_status.h"
 
 uint8_t source_buffer[PAGE_SIZE];
-//uint32_t task1Profiler, task2Profiler, task3Profiler;
-volatile profiler_stats_t ftl_profiler;
-volatile profiler_stats_t gc_profiler;
-volatile profiler_stats_t wl_profiler;
 
 volatile bool gc_requested = false;
 volatile bool wl_requested = false;
@@ -37,6 +33,8 @@ const TickType_t _10ms =  pdMS_TO_TICKS(10);
 /* FreeRTOS handles */
 static SemaphoreHandle_t gc_sem;
 static SemaphoreHandle_t wl_sem;
+
+static SemaphoreHandle_t stats_mutex;
 QueueHandle_t uart_rx_queue;
 
 /* Task prototypes */
@@ -54,10 +52,6 @@ int main(void)
 
 	/*Initialize the modules*/
 	profiler_init();
-
-	profiler_reset(&ftl_profiler);
-	profiler_reset(&gc_profiler);
-	profiler_reset(&wl_profiler);
 
 	/*UART initialize and test*/
     uart_init();
@@ -83,7 +77,7 @@ int main(void)
     /*Temporary data for source*/
     memset(source_buffer, 0x11, sizeof(source_buffer));
 
-    xTaskCreate(uart_cli_task, "UART_CLI", 256, NULL, 4, NULL);
+    xTaskCreate(uart_cli_task, "UART_CLI", 512, NULL, 4, NULL);
     uart2_enable_rx_interrupt();
 
     /*Create FTL task with higher priority*/
@@ -116,25 +110,21 @@ void ftl_task(void *pvParameters)
 	while(1)
 	{
 		static lpa_t lpa_test = 0;
-		uint32_t start_fl    = profiler_get_cycles();
-		ftl_status_t ftl_st  =  ftl_program(lpa_test, source_buffer );
-		uint32_t ftl_elapsed = profiler_elapsed_cycles(start_fl);
-		profiler_update(&ftl_profiler, ftl_elapsed);
 
-		if(ftl_st == FTL_OK){
-			ftl_write_counter++;
-			lpa_test++;
-			if(lpa_test >= LOGICAL_PAGE_COUNT ){
-				lpa_test = 0 ;
-			}
-			if(ftl_write_counter >= WL_CHECK_INTERVAL_WRITES){
-				ftl_write_counter = 0U;
-				if(!wl_requested){
-				wl_requested = true;
-				xSemaphoreGive(wl_sem);
-				}
-			}
-		}
+//		if(ftl_st == FTL_OK){
+//			ftl_write_counter++;
+//			lpa_test++;
+//			if(lpa_test >= LOGICAL_PAGE_COUNT ){
+//				lpa_test = 0 ;
+//			}
+//			if(ftl_write_counter >= WL_CHECK_INTERVAL_WRITES){
+//				ftl_write_counter = 0U;
+//				if(!wl_requested){
+//				wl_requested = true;
+//				xSemaphoreGive(wl_sem);
+//				}
+//			}
+//		}
 		uint32_t free_BC =  get_free_block_count();
 		if(free_BC <= LOW_WATERMARK_GC ){
 			if(!gc_requested){
@@ -158,7 +148,7 @@ void gc_task(void *pvParameters)
 			uint32_t start_gc = profiler_get_cycles();
 			gc_status_t gc_st =  run_gc();
 			uint32_t elapsed_gc = profiler_elapsed_cycles(start_gc);
-			profiler_update(&gc_profiler, elapsed_gc);
+
 			//task2Profiler++;
 
 			if(gc_st == GC_NO_VICTIM){
@@ -199,7 +189,7 @@ void wl_task(void *pvParameters){
 				uint32_t start_wl = profiler_get_cycles();
 				wl_status_t wl_st = wl_checkand_run();
 				uint32_t elapsed_wl = profiler_elapsed_cycles(start_wl);
-				profiler_update(&wl_profiler, elapsed_wl);
+
 
 			}
 		}

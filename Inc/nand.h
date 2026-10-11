@@ -1,26 +1,13 @@
 #ifndef NAND_H
 #define NAND_H
 
-/*	Fake NAND:        32 KiB
-	Page size:        64 bytes
-	Pages per block:  16
-	Blocks:           32
-	Physical pages:   512
-	Logical pages:    384
-	Spare pages:      128
-*/
 
 /* Header inclusions */
 #include <stdint.h>
 #include <math.h>
 #include "ftl.h"
-
-typedef enum
-{
-	NAND_PROGRAM_OK = 0,
-	NAND_READ_OK,
-	NAND_ERASE_OK,
-} nand_status_t;
+#include "app_defs.h"
+#include "app_status.h"
 
 /* Public initialization API */
 void nand_init(void);

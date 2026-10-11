@@ -1,23 +1,7 @@
 #include "FreeRTOS.h"
 #include "uart.h"
 #include "cli.h"
-
-
-#define GPIOAEN			(1U<<0)
-#define UART2EN			(1U<<17)
-#define CR1_TE			(1U<<3)
-#define CR1_RE          (1U<<2)
-#define CR1_UE			(1U<<13)
-
-#define SR_TXE			(1U<<7)
-#define SR_RXNE			(1U<<5)
-#define CR1_RXNEIE      (1U<<5)
-
-
-#define SYS_FREQ		16000000
-#define APB1_CLK		SYS_FREQ
-
-#define UART_BAUDRATE	115200
+#include <stdio.h>
 
 static void uart2_set_baudrate(uint32_t periph_clk, uint32_t baudrate);
 void uart2_write(char ch);
@@ -73,6 +57,18 @@ void uart_init(void)
 	//USART2->CR3 = (USART2->CR3 & ~(0x3 << 6)) | (0x3 << 6);
 
 
+}
+
+void uart2_write_number(uint32_t value)
+{
+    char buffer[11];
+
+    (void)snprintf(buffer,
+                   sizeof(buffer),
+                   "%lu",
+                   (unsigned long)value);
+
+    uart2_write_string(buffer);
 }
 
 void uart2_write(char ch)

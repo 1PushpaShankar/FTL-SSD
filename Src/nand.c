@@ -4,9 +4,12 @@
 #include <assert.h>
 #include "nand.h"
 #include "ftl.h"
+#include "app_defs.h"
+#include "app_status.h"
+
 
 /* Internal NAND flash array */
-static uint8_t nand_array[BLOCK_COUNT][PAGES_PER_BLOCK][PAGE_SIZE];
+static uint8_t nand_array[BLOCK_COUNT][PAGES_PER_BLOCK][PAGE_TOTAL_SIZE];
 
 void nand_init(void)
 {
@@ -17,7 +20,7 @@ nand_status_t nand_program(ppa_t ppn, const uint8_t *data_buffer){
 
 	uint8_t block_number = ppn/PAGES_PER_BLOCK;
 	uint8_t page_number  = ppn % PAGES_PER_BLOCK;
-	memcpy(nand_array[block_number][page_number], data_buffer, PAGE_SIZE);
+	memcpy(nand_array[block_number][page_number], data_buffer, PAGE_TOTAL_SIZE);
 
 	return NAND_PROGRAM_OK;
 }
@@ -26,7 +29,7 @@ nand_status_t nand_read(uint32_t ppn, uint8_t *data_buffer){
 
 	uint16_t block_number = ppn/PAGES_PER_BLOCK;
 	uint16_t page_number  = ppn % PAGES_PER_BLOCK;
-	memcpy(data_buffer, nand_array[block_number][page_number], PAGE_SIZE);
+	memcpy(data_buffer, nand_array[block_number][page_number], PAGE_TOTAL_SIZE);
 
 	return NAND_READ_OK;
 }
@@ -40,7 +43,7 @@ nand_status_t nand_erase(uint16_t block_number){
     for(uint32_t ppn = first_ppn; ppn  <= last_ppn; ppn++ ){
 		//page_status_t st = nand_get_page_status(ppn);
 		//assert(st != PAGE_PROGRAMMED);
-		memset(nand_array[block_number][ppn - first_ppn], 0xFF, PAGE_SIZE);
+		memset(nand_array[block_number][ppn - first_ppn], 0xFF, PAGE_TOTAL_SIZE);
     }
 
    return NAND_ERASE_OK;

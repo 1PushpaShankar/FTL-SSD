@@ -5,11 +5,14 @@
 #include "stm32f4xx.h"
 #include "FreeRTOS.h"
 #include "queue.h"
+#include "app_defs.h"
+#include "app_status.h"
 
 void uart_init(void);
 void uart2_write_string(const char *str);
 //char uart2_read(void);
 void uart2_write(char ch);
+void uart2_write_number(uint32_t value);
 void uart2_enable_rx_interrupt(void);
 void USART2_IRQHandler(void);
 

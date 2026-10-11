@@ -12,18 +12,12 @@
 #include "arm_math.h"
 #include "FreeRTOS.h"
 #include "task.h"
+#include "app_defs.h"
+#include "app_status.h"
+#include "stats.h"
 
 
-typedef struct{
-   uint32_t count;
-   uint32_t total_cycles;
-   uint32_t min_cycles;
-   uint32_t max_cycles;
-   uint32_t last_cycles;
-   uint32_t average_cycles;
-}profiler_stats_t;
-
-void profiler_init();
+void profiler_init(void);
 uint32_t profiler_get_cycles();
 uint32_t profiler_elapsed_cycles(uint32_t start);
 uint32_t profiler_cycles_to_us(uint32_t cycles);

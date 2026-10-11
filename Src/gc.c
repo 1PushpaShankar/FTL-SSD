@@ -3,30 +3,47 @@
 #include "nand.h"
 #include "gc.h"
 #include "ftl.h"
+#include "profiler.h"
+#include "FreeRTOSConfig.h"
+#include "FreeRTOS.h"
+#include "task.h"
+#include "semphr.h"
 
-#define GC_NO_VICTIM_BLOCK  ((uint16_t)0xFFFF)
+static ppa_t gc_allocate_destination_page(uint32_t victim_block);
 
 gc_status_t run_gc(){
 
+	map_lock();
+	uint32_t start = profiler_get_cycles();
 	uint16_t victim = gc_select_victim_block();
 	if(victim == GC_NO_VICTIM_BLOCK){
+		map_unlock();
+		uint32_t elapsed = profiler_elapsed_cycles(start);
+		stats_report_gc(elapsed);
 		return GC_NO_VICTIM;
 	}
+	map_unlock();
+
 	gc_status_t m_status = gc_migrate_valid_pages(victim);
 	if(m_status != GC_MIGRATED_VICTIM){
+		uint32_t elapsed = profiler_elapsed_cycles(start);
+		stats_report_gc(elapsed);
 		return m_status;
 	}
 	gc_status_t e_status = gc_erase_victim_block(victim);
 	if(e_status != GC_OK){
+		uint32_t elapsed = profiler_elapsed_cycles(start);
+		stats_report_gc(elapsed);
 		return e_status;
 	}
-
+	uint32_t elapsed = profiler_elapsed_cycles(start);
+	stats_report_gc(elapsed);
 	return GC_OK;
 
 }
 
 uint16_t gc_select_victim_block(void){
-	uint16_t victim = GC_NO_VICTIM;
+	uint16_t victim = GC_NO_VICTIM_BLOCK;
 	uint16_t max_invalid = 0;
 	for(uint16_t b = 0; b < BLOCK_COUNT; b++){
 		uint16_t invalid = block_table[b].invalid_page_count;
@@ -58,7 +75,7 @@ gc_status_t gc_migrate_valid_pages(uint16_t victim){
 			 return GC_NAND_ERROR;
 		  }
 
-		 ppa_t new_ppn = allocate_free_ppa();
+		 ppa_t new_ppn = gc_allocate_destination_page(victim);
 		 if(new_ppn == FTL_INVALID_PPA){
 			 return GC_NO_DESTINATION;
 
@@ -80,6 +97,7 @@ gc_status_t gc_migrate_valid_pages(uint16_t victim){
 
 		 page_state[new_ppn] = PAGE_PROGRAMMED;
 		 uint16_t new_block  = new_ppn/PAGES_PER_BLOCK;
+		 configASSERT(new_block != victim);
 		 block_table[new_block].valid_page_count++;
 		 block_table[new_block].free_page_count--;
 
@@ -88,13 +106,13 @@ gc_status_t gc_migrate_valid_pages(uint16_t victim){
 }
 /* Erase function - Do not update maps here*/
 gc_status_t gc_erase_victim_block(uint16_t victim){
-	nand_status_t e_status = nand_erase(victim);
+	nand_status_t e_status =  nand_control_erase_block(victim);
 
 	if(e_status != NAND_ERASE_OK){
 		block_table[victim].is_bad = 1;
 		block_table[victim].valid_page_count   = 0;
 		block_table[victim].invalid_page_count = 0;
-		block_table[victim].free_page_count    = PAGES_PER_BLOCK;
+		block_table[victim].free_page_count    = 0;
 		return GC_NAND_ERROR;
 	}
 
@@ -111,7 +129,8 @@ gc_status_t gc_erase_victim_block(uint16_t victim){
 		block_table[victim].is_bad = 1U;
 		block_table[victim].valid_page_count   = 0;
 		block_table[victim].invalid_page_count = 0;
-		block_table[victim].free_page_count    = 0U;
+		block_table[victim].free_page_count    = 0;
+		return GC_OK;
 	}
 	block_table[victim].valid_page_count   = 0;
 	block_table[victim].invalid_page_count = 0;
@@ -119,4 +138,9 @@ gc_status_t gc_erase_victim_block(uint16_t victim){
 
 	return GC_OK;
 
+}
+
+static ppa_t gc_allocate_destination_page(uint32_t victim_block)
+{
+    return get_free_page_spare(victim_block);
 }
